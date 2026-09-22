@@ -133,5 +133,21 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(self.get("/api/feed/nope")[0], 404)
 
 
+class OsintFrameworkDataTests(unittest.TestCase):
+    def test_bundled_dataset_is_well_formed(self):
+        path = Path(server.WEB_DIR) / "data" / "osint-framework.json"
+        data = json.loads(path.read_text())
+        tools = data["tools"]
+        self.assertGreater(len(tools), 1000)
+        cats = set(data["categories"])
+        for t in tools:
+            self.assertTrue(t["u"].startswith(("http://", "https://")), t)
+            self.assertIn(t["c"][0], cats)
+            self.assertTrue(t["n"])
+            self.assertLessEqual(set(t.get("f", "")), set("TDRMAIX"))
+        keys = [(t["n"], t["u"], tuple(t["c"])) for t in tools]
+        self.assertEqual(len(keys), len(set(keys)))
+
+
 if __name__ == "__main__":
     unittest.main()

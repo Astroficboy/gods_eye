@@ -1,4 +1,4 @@
-import { api, esc, table, link } from "./util.js";
+import { api, esc, table, link, toolkitButton } from "./util.js";
 
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 const IPV6 = /^[0-9a-f:]+:[0-9a-f:]*$/i;
@@ -103,7 +103,7 @@ function domainHtml(d) {
     link(`https://search.censys.io/search?resource=hosts&q=${d.domain}`, "Censys"),
     link(`https://www.virustotal.com/gui/domain/${d.domain}`, "VirusTotal"),
     link(`https://securitytrails.com/domain/${d.domain}/dns`, "SecurityTrails"),
-  ].join(" · ")}</p>`;
+  ].join(" · ")}</p>${toolkitButton("Domain Name", d.domain, "All domain tools")}`;
 }
 
 function ipHtml(d) {
@@ -127,5 +127,5 @@ function ipHtml(d) {
       link(`https://www.abuseipdb.com/check/${d.ip}`, "AbuseIPDB"),
       link(`https://www.virustotal.com/gui/ip-address/${d.ip}`, "VirusTotal"),
       link(`https://bgp.he.net/ip/${d.ip}`, "bgp.he.net"),
-    ].join(" · ")}</p>`;
+    ].join(" · ")}</p>${toolkitButton("IP & MAC Address", d.ip, "All IP tools")}`;
 }
