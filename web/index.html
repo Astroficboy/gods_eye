@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>God's Eye</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="eye" aria-hidden="true"></span>GOD'S EYE <small>OSINT situational awareness</small></div>
+    <div class="stats" id="stats"></div>
+    <div class="clock"><span id="utc">--:--:--</span> UTC</div>
+  </header>
+
+  <main>
+    <div id="map" aria-label="World map"></div>
+
+    <aside class="panel left" id="layers-panel">
+      <h2>Layers</h2>
+      <div id="layer-list"></div>
+      <h2>Search</h2>
+      <form id="goto-form" class="row">
+        <input id="goto" placeholder="lat, lon  or  callsign / sat name" autocomplete="off">
+        <button>Go</button>
+      </form>
+      <p class="hint">Click anywhere on the map for a location dossier.</p>
+      <div id="feed-health" class="health"></div>
+    </aside>
+
+    <aside class="panel right">
+      <nav class="tabs" role="tablist">
+        <button data-tab="events" class="active">Events</button>
+        <button data-tab="news">News</button>
+        <button data-tab="recon">Recon</button>
+        <button data-tab="dossier">Dossier</button>
+      </nav>
+
+      <section id="tab-events" class="tab active">
+        <div class="filter row">
+          <select id="event-filter">
+            <option value="all">All sources</option>
+            <option value="quake">Earthquakes</option>
+            <option value="gdacs">GDACS alerts</option>
+            <option value="eonet">Natural events</option>
+            <option value="squawk">Emergency squawks</option>
+          </select>
+        </div>
+        <ol id="event-list" class="list"></ol>
+      </section>
+
+      <section id="tab-news" class="tab">
+        <form id="news-form" class="row">
+          <input id="news-q" placeholder="GDELT query, e.g. earthquake OR wildfire" autocomplete="off">
+          <button>Search</button>
+        </form>
+        <ol id="news-list" class="list"></ol>
+      </section>
+
+      <section id="tab-recon" class="tab">
+        <form id="recon-form" class="row">
+          <input id="recon-q" placeholder="domain.com or public IP" autocomplete="off">
+          <button>Recon</button>
+        </form>
+        <p class="hint">DNS · certificate transparency (crt.sh) · RDAP/WHOIS · PTR · IP geolocation &amp; ASN. Hosts are plotted on the map.</p>
+        <div id="recon-out"></div>
+      </section>
+
+      <section id="tab-dossier" class="tab">
+        <div id="dossier-out"><p class="hint">Click the map to build a dossier for any location: address, local time, sun, nearby events, aircraft and Wikipedia-documented places.</p></div>
+      </section>
+    </aside>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
