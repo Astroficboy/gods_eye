@@ -1,7 +1,8 @@
-import { api, esc, table, ago, fmt, link, distanceKm } from "./util.js";
+import { api, esc, table, ago, fmt, link, distanceKm, toolkitButton } from "./util.js";
 import { createLayers } from "./layers.js";
 import { sunElevation } from "./sun.js";
 import { initRecon } from "./recon.js";
+import { initToolkit } from "./toolkit.js";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -163,6 +164,21 @@ loadNews();
 // ------------------------------------------------------------------ recon
 initRecon({ map, layer: byId.recon, showTab });
 
+// ------------------------------------------------------------------ OSINT Framework toolkit
+const toolkit = initToolkit();
+$("#toolkit-btn").addEventListener("click", () => toolkit.open());
+// Any element with data-toolkit="<category>" (and optional data-target) opens the toolkit there.
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-toolkit]");
+  if (el) toolkit.open({ category: el.dataset.toolkit || null, target: el.dataset.target ?? "" });
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) {
+    e.preventDefault();
+    toolkit.open();
+  }
+});
+
 // ------------------------------------------------------------------ dossier
 const pin = L.marker([0, 0], { opacity: 0.9 });
 map.on("click", (e) => dossier(e.latlng.lat, e.latlng.lng));
@@ -194,6 +210,7 @@ async function dossier(lat, lon) {
       link(`https://www.openstreetmap.org/#map=15/${lat}/${lon}`, "OSM"),
       link(`https://www.mapillary.com/app/?lat=${lat}&lng=${lon}&z=15`, "Mapillary"),
     ].join(" · ")],
+    ["More tools", toolkitButton("Geolocation Tools / Maps", `${lat.toFixed(5)}, ${lon.toFixed(5)}`, "Geolocation tools")],
   ]);
   const evHtml = evs.length ? `<ol class="list">${evs.slice(0, 10).map((e) => `<li><div>${esc(e.title)}</div><div class="meta"><span class="tag sev-${esc(e.severity)}">${esc(e.source)}</span><span>${fmt(e.d)} km</span><span>${esc(ago(e.time))}</span></div></li>`).join("")}</ol>` : `<p class="hint">No tracked events within 500 km.</p>`;
   out.innerHTML = `<h2>Location</h2>${local}<h2>Address</h2><p class="loading">Reverse geocoding</p><h2>Events ≤500 km</h2>${evHtml}<h2>Documented places (Wikipedia ≤10 km)</h2><p class="loading">Searching</p>`;

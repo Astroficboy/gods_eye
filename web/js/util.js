@@ -40,3 +40,8 @@ export const fmt = (n, digits = 0) => (n == null || isNaN(n) ? "–" : Number(n)
 export function link(href, text) {
   return `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(text ?? href)}</a>`;
 }
+
+/** A button that opens the OSINT Framework toolkit at a category, with a target prefilled. */
+export function toolkitButton(category, target, label) {
+  return `<button class="tk-launch small" data-toolkit="${esc(category)}" data-target="${esc(target)}">${esc(label)} in OSINT Framework →</button>`;
+}

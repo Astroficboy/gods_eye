@@ -3,8 +3,9 @@
 A single-screen "god's eye view" of the world built only from **public, keyless
 open-source intelligence feeds**. It combines live air traffic, orbital objects,
 seismic activity, disaster alerts, natural hazards, weather, space weather and
-global news on one map. It also has an infrastructure-recon workbench and a
-dossier for any clicked location.
+global news on one map. It also has an infrastructure-recon workbench, a
+dossier for any clicked location, and the full
+[OSINT Framework](https://osintframework.com) catalogue of about 1,165 tools, which you can search and filter.
 
 ```
 python3 server.py            # live feeds  → http://127.0.0.1:8080
@@ -46,6 +47,30 @@ The basemap can be switched between dark, Esri satellite imagery and OSM streets
   - Wikipedia-documented places within 10 km
   - one-click links to Google, Bing, Sentinel Hub, Zoom Earth, OSM and Mapillary imagery
 
+### OSINT Framework toolkit
+
+Open it with the **⌘ OSINT Framework** button in the top bar, or press `T`. It contains every tool from
+[osintframework.com](https://osintframework.com) (33 categories), bundled locally so it works offline:
+
+- **Target box.** Paste a selector and the categories that accept it are picked automatically.
+  - Recognised types: email, domain, URL, IPv4/IPv6, MAC, phone, username, Bitcoin/Ethereum address,
+    file hash, image URL, `lat, lon`, aircraft/ship registration.
+  - Clicking a tool copies the target to your clipboard and opens the tool.
+- **Search.** Matches words against tool names, descriptions, inputs and outputs.
+- **Filters:**
+  - Free
+  - Passive OPSEC (doesn't touch or notify the target)
+  - No signup
+  - Web-based
+  - Has API
+  - Hide down/deprecated
+- **Category tree** with live counts. Each card shows status, pricing, OPSEC notes and flags
+  (local tool, Google dork, registration required, edit URL manually).
+- Recon results and location dossiers have buttons that jump into the relevant toolkit category with the target pre-filled.
+
+To refresh the bundled list from upstream, run `python3 tools/update_osint_framework.py`.
+OSINT Framework is MIT-licensed by Justin Nordine. Its licence is in `web/data/OSINT-FRAMEWORK-LICENSE`.
+
 The **Search** box accepts `lat, lon`, an aircraft callsign or ICAO24 hex, or a satellite name or NORAD ID.
 
 ## Architecture
@@ -58,6 +83,9 @@ web/js/main.js   map, layer scheduling, events/news/dossier/search
 web/js/layers.js one object per data layer (load / tick / popups)
 web/js/recon.js  domain & IP recon panel
 web/js/sun.js    solar position + terminator polygon
+web/js/toolkit.js OSINT Framework browser (search, filters, selector detection)
+web/data/        bundled OSINT Framework catalogue + licence
+tools/update_osint_framework.py  regenerate web/data/osint-framework.json
 tests/           python -m unittest discover -s tests
 ```
 
@@ -73,7 +101,9 @@ TTL, so several open tabs don't hammer the upstream providers.
   inside the rate limit. For heavier use, register and add credentials to the request in `fetch()`.
 - crt.sh can be slow for large domains. Its lookup has a 40 s timeout, and the rest of the recon still returns.
 - Please respect each provider's terms of use and rate limits. Nominatim, for example, allows about 1 request/s.
-- By design, this tool covers world events and internet infrastructure. It has no people-search features.
+- The live map and recon panels cover world events and internet infrastructure. The OSINT Framework
+  toolkit links out to third-party services; it runs no queries itself. Follow each service's terms
+  and the laws that apply to you.
 
 ## Ideas for extension
 
