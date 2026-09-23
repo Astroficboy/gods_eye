@@ -11,6 +11,7 @@
   <header class="topbar">
     <div class="brand"><span class="eye" aria-hidden="true"></span>GOD'S EYE <small>OSINT situational awareness</small></div>
     <div class="stats" id="stats"></div>
+    <button id="toolkit-btn" class="tk-launch" title="Browse all OSINT Framework tools (press T)">⌘ OSINT Framework</button>
     <div class="clock"><span id="utc">--:--:--</span> UTC</div>
   </header>
 
@@ -73,6 +74,33 @@
     </aside>
   </main>
 
+  <section id="toolkit" class="toolkit" hidden aria-label="OSINT Framework toolkit">
+    <header class="tk-head">
+      <h1>OSINT Framework <small>1,100+ tools · <a href="https://osintframework.com" target="_blank" rel="noopener noreferrer">osintframework.com</a> (MIT)</small></h1>
+      <div class="tk-inputs">
+        <label class="tk-field"><span>Target</span><input id="tk-target" placeholder="email, domain, IP, phone, username, wallet, hash, lat,lon…" autocomplete="off"><em id="tk-selector"></em></label>
+        <label class="tk-field"><span>Search</span><input id="tk-q" placeholder="filter tools, e.g. reverse image, breach, AIS" autocomplete="off"></label>
+      </div>
+      <button id="tk-close" title="Close (Esc)">✕</button>
+    </header>
+    <div id="tk-filters" class="tk-filters"></div>
+    <div class="tk-body">
+      <nav id="tk-tree" class="tk-tree"></nav>
+      <div class="tk-main">
+        <div id="tk-summary" class="tk-summary"></div>
+        <div id="tk-results" class="tk-results"></div>
+      </div>
+    </div>
+    <div id="tk-toast" class="tk-toast" hidden></div>
+  </section>
+
+  <div id="file-warning" class="file-warning" hidden>
+    <h1>God's Eye can't run from a local file</h1>
+    <p>Browsers block this page's scripts when it's opened as <code>file://</code>. Start it with a local web server instead:</p>
+    <pre>python3 server.py</pre>
+    <p>Then open <a href="http://127.0.0.1:8080">http://127.0.0.1:8080</a>. You can also use the hosted version on GitHub Pages.</p>
+  </div>
+  <script>if (location.protocol === "file:") document.getElementById("file-warning").hidden = false;</script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
   <script type="module" src="js/main.js"></script>

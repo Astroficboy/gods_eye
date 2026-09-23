@@ -1,5 +1,20 @@
+// Use server.py's /api when it's there; otherwise (static hosting) call the
+// upstream sources straight from the browser via direct.js.
+let mode = null;
+export function apiMode() {
+  mode ||= fetch("api/feeds")
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((b) => (Array.isArray(b.feeds) ? (b.demo ? "demo" : "server") : "direct"))
+    .catch(() => "direct");
+  return mode;
+}
+
 export async function api(path) {
-  const res = await fetch(`/api/${path}`);
+  if ((await apiMode()) === "direct") {
+    const { direct } = await import("./direct.js");
+    return direct(path);
+  }
+  const res = await fetch(`api/${path}`);
   const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
   if (!res.ok || (body && body.error && Object.keys(body).length === 1)) {
     throw new Error(body.error || `HTTP ${res.status}`);
@@ -39,4 +54,9 @@ export const fmt = (n, digits = 0) => (n == null || isNaN(n) ? "–" : Number(n)
 
 export function link(href, text) {
   return `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(text ?? href)}</a>`;
+}
+
+/** A button that opens the OSINT Framework toolkit at a category, with a target prefilled. */
+export function toolkitButton(category, target, label) {
+  return `<button class="tk-launch small" data-toolkit="${esc(category)}" data-target="${esc(target)}">${esc(label)} in OSINT Framework →</button>`;
 }
