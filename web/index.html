@@ -94,6 +94,13 @@
     <div id="tk-toast" class="tk-toast" hidden></div>
   </section>
 
+  <div id="file-warning" class="file-warning" hidden>
+    <h1>God's Eye can't run from a local file</h1>
+    <p>Browsers block this page's scripts when it's opened as <code>file://</code>. Start it with a local web server instead:</p>
+    <pre>python3 server.py</pre>
+    <p>Then open <a href="http://127.0.0.1:8080">http://127.0.0.1:8080</a>. You can also use the hosted version on GitHub Pages.</p>
+  </div>
+  <script>if (location.protocol === "file:") document.getElementById("file-warning").hidden = false;</script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
   <script type="module" src="js/main.js"></script>
