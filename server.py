@@ -15,6 +15,7 @@ import argparse
 import ipaddress
 import json
 import mimetypes
+import os
 import re
 import threading
 import time
@@ -316,8 +317,10 @@ def demo_response(route: str, p: dict):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=8080)
+    # Hosting platforms (Render, Railway, Fly, Heroku, Cloud Run) pass PORT and expect 0.0.0.0.
+    env_port = os.environ.get("PORT")
+    ap.add_argument("--host", default=os.environ.get("HOST", "0.0.0.0" if env_port else "127.0.0.1"))
+    ap.add_argument("--port", type=int, default=int(env_port or 8080))
     ap.add_argument("--demo", action="store_true", help="serve bundled sample data instead of live feeds")
     args = ap.parse_args()
     Handler.demo = args.demo
@@ -325,8 +328,9 @@ def main():
         import demo_data
         DEMO_DATA.update(demo_data.build())
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
+    httpd.daemon_threads = True
     mode = "DEMO (sample data)" if args.demo else "LIVE"
-    print(f"God's Eye [{mode}] → http://{args.host}:{args.port}")
+    print(f"God's Eye [{mode}] → http://{args.host}:{args.port}", flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

@@ -1,4 +1,4 @@
-import { api, esc, table, ago, fmt, link, distanceKm, toolkitButton } from "./util.js";
+import { api, apiMode, esc, table, ago, fmt, link, distanceKm, toolkitButton } from "./util.js";
 import { createLayers } from "./layers.js";
 import { sunElevation } from "./sun.js";
 import { initRecon } from "./recon.js";
@@ -250,4 +250,9 @@ $("#goto-form").addEventListener("submit", (e) => {
 });
 $("#goto").addEventListener("input", () => $("#goto").setCustomValidity(""));
 
-api("feeds").then((f) => { if (f.demo) document.title += " [DEMO]"; $(".brand small").textContent += f.demo ? " · DEMO DATA" : ""; }).catch(() => {});
+apiMode().then((m) => {
+  const label = { demo: " · DEMO DATA", direct: " · serverless" }[m];
+  if (label) $(".brand small").textContent += label;
+  if (m === "demo") document.title += " [DEMO]";
+  if (m === "direct") $(".brand small").title = "No server.py detected: data is fetched straight from each source. A few sources may block this (CORS); run server.py for full coverage.";
+});

@@ -13,7 +13,30 @@ python3 server.py --demo     # synthetic sample data, works fully offline
 ```
 
 It needs only Python 3.9+ and a browser. There is nothing to install and no API keys. Leaflet and
-satellite.js load from jsDelivr.
+satellite.js load from jsDelivr. Don't open `web/index.html` directly as a file: browsers block its
+scripts. Use the server, or one of the hosted options below.
+
+## Putting it online
+
+The site runs in one of two modes, and picks the right one automatically:
+
+| Mode | When | How data is fetched |
+|---|---|---|
+| **Server** | `server.py` is running | The server fetches every source, with caching and no browser restrictions. Most complete. |
+| **Serverless** | Hosted as static files (GitHub Pages, Netlify, …) | The browser calls each source directly. The top bar shows "serverless". A source that blocks cross-site requests (CORS) shows as *offline* in Feed health; everything else keeps working. |
+
+**Free static hosting on GitHub Pages (serverless):**
+1. Merge this branch into `main`.
+2. In the repo, go to **Settings → Pages → Build and deployment** and set **Source** to **GitHub Actions**.
+3. The *Deploy to GitHub Pages* workflow publishes `web/` to `https://<user>.github.io/<repo>/`.
+
+**Full server version (Docker; works on Render, Railway, Fly.io, Cloud Run, a VPS):**
+```
+docker build -t gods-eye . && docker run -p 8080:8080 gods-eye
+```
+- **Render:** New → Blueprint → select this repo (it reads `render.yaml`).
+- **Railway / Heroku:** they use the `Procfile`.
+- The server reads the `PORT` environment variable and binds to `0.0.0.0` when it is set.
 
 ## What's on the map
 
@@ -86,7 +109,8 @@ web/js/sun.js    solar position + terminator polygon
 web/js/toolkit.js OSINT Framework browser (search, filters, selector detection)
 web/data/        bundled OSINT Framework catalogue + licence
 tools/update_osint_framework.py  regenerate web/data/osint-framework.json
-tests/           python -m unittest discover -s tests
+web/js/direct.js serverless mode: the /api routes implemented in the browser
+tests/           python -m unittest discover -s tests (also run by .github/workflows/ci.yml)
 ```
 
 The browser only talks to `server.py`. The server fetches from a **fixed
