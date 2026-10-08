@@ -45,7 +45,7 @@ CELESTRAK = "https://celestrak.org/NORAD/elements/gp.php?FORMAT=tle&GROUP="
 # Static, keyless feeds. The browser only ever names a key from this table,
 # so the server can never be pointed at an arbitrary URL.
 FEEDS: dict[str, Feed] = {
-    "aircraft": Feed("https://opensky-network.org/api/states/all", 15),
+    "aircraft": Feed("https://opensky-network.org/api/states/all", 60),
     "quakes": Feed("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson", 60),
     "eonet": Feed("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&days=30", 600),
     "gdacs": Feed("https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP", 600),
@@ -229,6 +229,58 @@ def place(lat: float, lon: float) -> dict:
     }
 
 
+# OpenSky is global but rate-limits anonymous use hard; when it fails, fall back
+# to community ADS-B aggregators that serve a 250 nm radius around a point.
+REGIONAL_ADSB = (
+    ("adsb.lol", "https://api.adsb.lol/v2/point/{lat}/{lon}/250"),
+    ("airplanes.live", "https://api.airplanes.live/v2/point/{lat}/{lon}/250"),
+    ("adsb.fi", "https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/250"),
+)
+_opensky_retry_at = 0.0
+
+
+def readsb_to_states(body: dict) -> dict:
+    """Convert a readsb-style aircraft list to OpenSky's state-vector shape."""
+    ft, kt, fpm = 0.3048, 0.514444, 0.00508
+    now = time.time()
+    states = []
+    for a in body.get("ac") or body.get("aircraft") or []:
+        if a.get("lat") is None or a.get("lon") is None:
+            continue
+        ground = a.get("alt_baro") == "ground"
+        baro = a["alt_baro"] * ft if isinstance(a.get("alt_baro"), (int, float)) else None
+        geom = a["alt_geom"] * ft if isinstance(a.get("alt_geom"), (int, float)) else None
+        seen = round(now - (a.get("seen_pos") or a.get("seen") or 0))
+        rate = a.get("baro_rate", a.get("geom_rate"))
+        states.append([
+            str(a.get("hex", "")).lstrip("~"), a.get("flight") or a.get("r") or "", a.get("r") or "", seen, seen,
+            a["lon"], a["lat"], 0 if ground else baro, ground, a["gs"] * kt if a.get("gs") is not None else None,
+            a.get("track", a.get("true_heading")), rate * fpm if rate is not None else None, None,
+            0 if ground else (geom if geom is not None else baro), a.get("squawk"), False, 0,
+        ])
+    return {"time": int(now), "states": states}
+
+
+def aircraft(lat: float, lon: float) -> dict:
+    global _opensky_retry_at
+    errors = []
+    if time.time() >= _opensky_retry_at:
+        feed = FEEDS["aircraft"]
+        try:
+            return {**fetch(feed.url, feed.ttl), "source": "OpenSky", "scope": "global"}
+        except UpstreamError as exc:
+            errors.append(f"OpenSky: {exc}")
+            _opensky_retry_at = time.time() + 600  # don't burn the quota retrying every refresh
+    lat, lon = round(lat, 1), round(lon, 1)
+    for name, url in REGIONAL_ADSB:
+        try:
+            body = fetch(url.format(lat=lat, lon=lon), 15)
+            return {**readsb_to_states(body), "source": name, "scope": "regional"}
+        except UpstreamError as exc:
+            errors.append(f"{name}: {exc}")
+    raise UpstreamError(" · ".join(errors))
+
+
 def news(query: str) -> dict:
     query = query.strip()[:200] or "(conflict OR protest OR disaster OR attack)"
     url = ("https://api.gdeltproject.org/api/v2/doc/doc?mode=artlist&format=json&sort=datedesc"
@@ -260,6 +312,8 @@ class Handler(BaseHTTPRequestHandler):
                 data = demo_response(route, p)
                 status = HTTPStatus.NOT_FOUND if data == {"error": "not found"} else HTTPStatus.OK
                 return self.send_json(data, status)
+            if route == "feed/aircraft":
+                return self.send_json(aircraft(*valid_coord(p.get("lat", "0"), p.get("lon", "0"))))
             if route.startswith("feed/"):
                 feed = FEEDS.get(route[len("feed/"):])
                 if not feed:

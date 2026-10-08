@@ -4,7 +4,6 @@
 
 const CELESTRAK = "https://celestrak.org/NORAD/elements/gp.php?FORMAT=tle&GROUP=";
 const FEEDS = {
-  aircraft: ["https://opensky-network.org/api/states/all", 15],
   quakes: ["https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson", 60],
   eonet: ["https://eonet.gsfc.nasa.gov/api/v3/events?status=open&days=30", 600],
   gdacs: ["https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP", 600],
@@ -150,12 +149,67 @@ function news(q) {
   return fetchCached(`https://api.gdeltproject.org/api/v2/doc/doc?mode=artlist&format=json&sort=datedesc&maxrecords=60&timespan=24h&query=${enc(q)}`, 300);
 }
 
+// ---------------------------------------------------------------- aircraft
+// OpenSky gives a global picture but rate-limits anonymous users hard (and may
+// block browser requests). When it fails, fall back to community ADS-B
+// aggregators that serve a 250 nm radius around a point, in readsb format.
+const OPENSKY = "https://opensky-network.org/api/states/all";
+const REGIONAL = [
+  ["adsb.lol", (lat, lon) => `https://api.adsb.lol/v2/point/${lat}/${lon}/250`],
+  ["airplanes.live", (lat, lon) => `https://api.airplanes.live/v2/point/${lat}/${lon}/250`],
+  ["adsb.fi", (lat, lon) => `https://opendata.adsb.fi/api/v2/lat/${lat}/lon/${lon}/dist/250`],
+];
+let openskyRetryAt = 0;
+
+/** Convert a readsb-style aircraft list to OpenSky's state-vector shape. */
+export function readsbToStates(body) {
+  const FT = 0.3048, KT = 0.514444, FPM = 0.00508;
+  const states = [];
+  for (const a of body.ac || body.aircraft || []) {
+    if (a.lat == null || a.lon == null) continue;
+    const ground = a.alt_baro === "ground";
+    const baro = typeof a.alt_baro === "number" ? a.alt_baro * FT : null;
+    const geom = typeof a.alt_geom === "number" ? a.alt_geom * FT : null;
+    const seen = Math.round(Date.now() / 1000 - (a.seen_pos ?? a.seen ?? 0));
+    const rate = a.baro_rate ?? a.geom_rate;
+    states.push([
+      String(a.hex || "").replace(/^~/, ""), a.flight || a.r || "", a.r || "", seen, seen,
+      a.lon, a.lat, ground ? 0 : baro, ground, a.gs != null ? a.gs * KT : null, a.track ?? a.true_heading ?? null,
+      rate != null ? rate * FPM : null, null, ground ? 0 : geom ?? baro, a.squawk ?? null, false, 0,
+    ]);
+  }
+  return { time: Math.round(Date.now() / 1000), states };
+}
+
+export async function aircraft(lat, lon, fetcher = fetchCached) {
+  const errors = [];
+  if (Date.now() >= openskyRetryAt) {
+    try {
+      return { ...(await fetcher(OPENSKY, 60)), source: "OpenSky", scope: "global" };
+    } catch (err) {
+      errors.push(`OpenSky: ${err.message}`);
+      openskyRetryAt = Date.now() + 10 * 60000; // don't burn the quota retrying every refresh
+    }
+  }
+  lat = Math.round(Math.max(-85, Math.min(85, Number(lat) || 0)) * 10) / 10;
+  lon = Math.round((((Number(lon) || 0) + 540) % 360 - 180) * 10) / 10;
+  for (const [name, url] of REGIONAL) {
+    try {
+      return { ...readsbToStates(await fetcher(url(lat, lon), 15)), source: name, scope: "regional" };
+    } catch (err) {
+      errors.push(`${name}: ${err.message}`);
+    }
+  }
+  throw new Error(errors.join(" · "));
+}
+
 /** Handle an /api path (e.g. "recon/ip?addr=1.1.1.1") entirely in the browser. */
 export async function direct(path) {
   const u = new URL(path, "http://x/");
   const route = u.pathname.slice(1);
   const p = Object.fromEntries(u.searchParams);
   if (route === "feeds") return { feeds: Object.keys(FEEDS).sort(), demo: false, mode: "direct" };
+  if (route === "feed/aircraft") return aircraft(p.lat, p.lon);
   if (route.startsWith("feed/")) {
     const f = FEEDS[route.slice(5)];
     if (!f) throw new Error("unknown feed");
