@@ -21,14 +21,18 @@ export function createLayers(map, state) {
     id: "aircraft", name: "Aircraft (ADS-B)", color: "#ffe066", interval: 20000, on: true,
     group: L.layerGroup(),
     async load() {
-      const data = await api("feed/aircraft");
+      const c = map.getCenter().wrap();
+      const data = await api(`feed/aircraft?lat=${c.lat.toFixed(1)}&lon=${c.lng.toFixed(1)}`);
+      // Global (OpenSky) or 250 nm around the map centre (fallback aggregators).
+      this.regional = data.scope === "regional";
+      this.note = data.source ? `${data.source}${this.regional ? " · 250 nm around map centre — pan to update" : " · global"}` : "";
       this.group.clearLayers();
       const planes = [];
       const alerts = [];
       for (const s of data.states || []) {
         const [icao24, callsign, country, , lastContact, lon, lat, baroAlt, onGround, velocity, track, vrate, , geoAlt, squawk] = s;
         if (lat == null || lon == null) continue;
-        const p = { icao24, callsign: (callsign || "").trim(), country, lat, lon, alt: geoAlt ?? baroAlt, onGround, velocity, track, vrate, squawk, lastContact };
+        const p = { icao24, callsign: (callsign || "").trim(), country, lat, lon, alt: geoAlt ?? baroAlt, onGround, velocity, track, vrate, squawk, lastContact, source: data.source };
         planes.push(p);
         const emergency = EMERGENCY_SQUAWKS[squawk];
         p.marker = L.circleMarker([lat, lon], {
@@ -45,9 +49,16 @@ export function createLayers(map, state) {
       }
       state.aircraft = planes;
       events("squawk", alerts);
-      return planes.length;
+      return this.regional ? `${fmt(planes.length)} · local` : planes.length;
     },
   };
+  // In regional mode the data only covers the area around the map centre, so follow the map.
+  let panTimer;
+  map.on("moveend", () => {
+    if (!aircraft.on || !aircraft.regional) return;
+    clearTimeout(panTimer);
+    panTimer = setTimeout(() => state.refresh?.(aircraft), 800);
+  });
 
   // ---------------------------------------------------------------- earthquakes
   const quakes = {
@@ -257,7 +268,7 @@ function planePopup(p) {
   const squawk = EMERGENCY_SQUAWKS[p.squawk] ? `<span class="error">${esc(p.squawk)} — ${EMERGENCY_SQUAWKS[p.squawk]}</span>` : esc(p.squawk);
   return `<b>✈ ${esc(p.callsign || "(no callsign)")}</b>` + table([
     ["ICAO24", esc(p.icao24)],
-    ["Registered", esc(p.country)],
+    ["Origin / reg.", esc(p.country)],
     ["Altitude", p.onGround ? "on ground" : `${fmt(p.alt)} m (${fmt(p.alt * 3.28084)} ft)`],
     ["Speed", `${fmt(p.velocity * 3.6)} km/h`],
     ["Heading", `${fmt(p.track)}°`],
@@ -266,6 +277,7 @@ function planePopup(p) {
     ["Last contact", ago(p.lastContact * 1000)],
     ["Track", link(`https://globe.adsbexchange.com/?icao=${encodeURIComponent(p.icao24)}`, "ADS-B Exchange") + " · " +
       link(`https://opensky-network.org/aircraft-profile?icao24=${encodeURIComponent(p.icao24)}`, "OpenSky")],
+    ["Data", esc(p.source)],
   ]);
 }
 

@@ -26,6 +26,7 @@ L.control.layers(basemaps, null, { position: "bottomleft" }).addTo(map);
 const state = {
   aircraft: [], sats: [], quakes: 0, events: {}, health: {},
   onEvents: () => renderEvents(),
+  refresh: (l) => refresh(l),
 };
 
 // ------------------------------------------------------------------ layers
@@ -54,7 +55,9 @@ async function refresh(l) {
   try {
     const n = await l.load();
     state.health[l.id] = { ok: true, at: Date.now() };
-    if (n != null) $(`#count-${l.id}`).textContent = fmt(n);
+    const count = $(`#count-${l.id}`);
+    if (n != null) count.textContent = typeof n === "number" ? fmt(n) : n;
+    count.title = l.note || "";
   } catch (err) {
     state.health[l.id] = { ok: false, at: Date.now(), error: err.message };
     $(`#count-${l.id}`).innerHTML = `<span class="err" title="${esc(err.message)}">offline</span>`;

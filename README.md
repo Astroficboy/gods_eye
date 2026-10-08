@@ -42,7 +42,7 @@ docker build -t gods-eye . && docker run -p 8080:8080 gods-eye
 
 | Layer | Source | Refresh | OSINT technique |
 |---|---|---|---|
-| Aircraft | [OpenSky Network](https://opensky-network.org) ADS-B state vectors | 20 s | ADS-B / SIGINT-adjacent tracking; altitude-coloured, **emergency squawks 7500/7600/7700** raised as red alerts |
+| Aircraft | [OpenSky Network](https://opensky-network.org) (global); falls back to [adsb.lol](https://adsb.lol), [airplanes.live](https://airplanes.live), [adsb.fi](https://adsb.fi) (250 nm around the map centre) | 20 s | ADS-B / SIGINT-adjacent tracking; altitude-coloured, **emergency squawks 7500/7600/7700** raised as red alerts |
 | Satellites | [CelesTrak](https://celestrak.org) TLEs (stations, brightest, GPS, weather) | propagated every 2 s | Orbital tracking with SGP4; click one for its ground track (−45/+95 min) |
 | Earthquakes | [USGS](https://earthquake.usgs.gov) all-day GeoJSON | 60 s | Seismic monitoring; size = magnitude, tsunami flag |
 | Disaster alerts | [GDACS](https://www.gdacs.org) | 10 min | Cyclones, floods, volcanoes, droughts, wildfires, with alert level |
@@ -121,8 +121,10 @@ TTL, so several open tabs don't hammer the upstream providers.
 
 ## Notes and limits
 
-- OpenSky's anonymous API is rate-limited (about 400 requests/day, 10 s resolution). The 15 s server cache keeps one tab
-  inside the rate limit. For heavier use, register and add credentials to the request in `fetch()`.
+- OpenSky's anonymous API is heavily rate-limited: a global request costs several credits, which works out to roughly
+  100 requests a day. When it fails, the aircraft layer stops asking OpenSky for 10 minutes. Meanwhile it uses
+  the regional aggregators, follows the map as you pan, and the count shows "· local". Hover the count to see
+  which source is in use.
 - crt.sh can be slow for large domains. Its lookup has a 40 s timeout, and the rest of the recon still returns.
 - Please respect each provider's terms of use and rate limits. Nominatim, for example, allows about 1 request/s.
 - The live map and recon panels cover world events and internet infrastructure. The OSINT Framework

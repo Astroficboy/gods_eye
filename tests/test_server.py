@@ -78,6 +78,54 @@ class ReconTests(unittest.TestCase):
         self.assertEqual(urlopen.call_count, 1)
 
 
+class AircraftFallbackTests(unittest.TestCase):
+    READSB = {"ac": [
+        {"hex": "~a1b2c3", "flight": "UAL123  ", "r": "N12345", "lat": 40.0, "lon": -74.0, "alt_baro": 35000,
+         "alt_geom": 35500, "gs": 450, "track": 90, "baro_rate": 1000, "squawk": "7700", "seen": 1},
+        {"hex": "abcdef", "lat": 40.1, "lon": -74.1, "alt_baro": "ground", "gs": 10},
+        {"hex": "nopos"},
+    ]}
+
+    def setUp(self):
+        server._opensky_retry_at = 0
+
+    def test_readsb_conversion_matches_opensky_layout(self):
+        states = server.readsb_to_states(self.READSB)["states"]
+        self.assertEqual(len(states), 2)
+        s = states[0]
+        self.assertEqual((s[0], s[1].strip(), s[2], s[5], s[6], s[14]), ("a1b2c3", "UAL123", "N12345", -74.0, 40.0, "7700"))
+        self.assertAlmostEqual(s[7], 35000 * 0.3048)
+        self.assertAlmostEqual(s[13], 35500 * 0.3048)
+        self.assertAlmostEqual(s[9], 450 * 0.514444)
+        self.assertTrue(states[1][8])  # on ground
+        self.assertEqual(states[1][13], 0)
+
+    def test_falls_back_when_opensky_fails_and_backs_off(self):
+        calls = []
+
+        def fake_fetch(url, ttl, kind="json", timeout=20):
+            calls.append(url)
+            if "opensky" in url:
+                raise server.UpstreamError("opensky-network.org: HTTP Error 429: Too Many Requests")
+            if "adsb.lol" in url:
+                raise server.UpstreamError("api.adsb.lol: timed out")
+            return self.READSB
+
+        with mock.patch.object(server, "fetch", side_effect=fake_fetch):
+            out = server.aircraft(51.47, -0.45)
+            self.assertEqual((out["source"], out["scope"], len(out["states"])), ("airplanes.live", "regional", 2))
+            self.assertIn("/51.5/-0.5/250", calls[-1])
+            server.aircraft(51.5, -0.5)
+        self.assertEqual(sum("opensky" in c for c in calls), 1)  # second call skipped OpenSky
+
+    def test_all_sources_failing_reports_each(self):
+        with mock.patch.object(server, "fetch", side_effect=server.UpstreamError("down")):
+            with self.assertRaises(server.UpstreamError) as ctx:
+                server.aircraft(0, 0)
+        for name in ("OpenSky", "adsb.lol", "airplanes.live", "adsb.fi"):
+            self.assertIn(name, str(ctx.exception))
+
+
 class HttpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
