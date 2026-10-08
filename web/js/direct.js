@@ -2,6 +2,8 @@
 // against CORS-enabled public endpoints. Used automatically when the page is
 // hosted statically (GitHub Pages, Netlify, …) and no server.py is present.
 
+import { PROXY_URL } from "../config.js";
+
 const CELESTRAK = "https://celestrak.org/NORAD/elements/gp.php?FORMAT=tle&GROUP=";
 const FEEDS = {
   quakes: ["https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson", 60],
@@ -17,6 +19,23 @@ const FEEDS = {
 const DNS_TYPES = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"];
 const DOMAIN_RE = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/;
 
+// Hosts that refused a direct browser request (CORS); later calls go straight via the proxy.
+const viaProxy = new Set();
+const proxied = (url) => `${PROXY_URL.replace(/\/+$/, "")}/?url=${encodeURIComponent(url)}`;
+
+async function request(url, signal) {
+  const host = new URL(url).host;
+  if (PROXY_URL && viaProxy.has(host)) return fetch(proxied(url), { signal });
+  try {
+    return await fetch(url, { signal });
+  } catch (err) {
+    // A TypeError here means the request never got a readable answer: usually CORS.
+    if (!PROXY_URL || err.name === "AbortError") throw err;
+    viaProxy.add(host);
+    return fetch(proxied(url), { signal });
+  }
+}
+
 // Cache in memory and sessionStorage, so reloads and tabs don't re-hit rate-limited APIs.
 const memo = new Map();
 async function fetchCached(url, ttl, kind = "json", timeout = 25000) {
@@ -25,15 +44,21 @@ async function fetchCached(url, ttl, kind = "json", timeout = 25000) {
   if (hit && now - hit.at < ttl * 1000) return hit.value;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeout);
+  const host = new URL(url).host;
   let res;
   try {
-    res = await fetch(url, { signal: ctl.signal });
+    res = await request(url, ctl.signal);
   } catch (err) {
-    throw new Error(`${new URL(url).host}: ${err.name === "AbortError" ? "timed out" : "unreachable (network or CORS)"}`);
+    const why = err.name === "AbortError" ? "timed out"
+      : PROXY_URL ? "unreachable, even via proxy" : "unreachable (network or CORS) — set PROXY_URL in config.js";
+    throw new Error(`${host}: ${why}`);
   } finally {
     clearTimeout(timer);
   }
-  if (!res.ok) throw new Error(`${new URL(url).host}: HTTP ${res.status}`);
+  if (!res.ok) {
+    const detail = await res.json().then((b) => b.error).catch(() => "");
+    throw new Error(`${host}: HTTP ${res.status}${detail ? ` (${detail})` : ""}${viaProxy.has(host) ? " via proxy" : ""}`);
+  }
   const value = kind === "json" ? await res.json() : await res.text();
   memo.set(url, { at: now, value });
   writeStore(url, { at: now, value });

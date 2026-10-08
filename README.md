@@ -30,7 +30,24 @@ The site runs in one of two modes, and picks the right one automatically:
 2. In the repo, go to **Settings → Pages → Build and deployment** and set **Source** to **GitHub Actions**.
 3. The *Deploy to GitHub Pages* workflow publishes `web/` to `https://<user>.github.io/<repo>/`.
 
-**Full server version (Docker; works on Render, Railway, Fly.io, Cloud Run, a VPS):**
+### CORS proxy (for GitHub Pages)
+
+Some sources refuse requests from web pages. This includes all the aircraft feeds, which show as offline on a static site.
+`proxy/worker.js` is a small Cloudflare Worker that fetches those sources for the site. It is free on
+Cloudflare's plan (100,000 requests a day). It only fetches the site's own data sources, and only for the
+sites listed in `ALLOWED_ORIGINS`.
+
+1. Sign up at [dash.cloudflare.com](https://dash.cloudflare.com) (free).
+2. Go to **Workers & Pages → Create → Create Worker**, name it e.g. `gods-eye-proxy`, and click **Deploy**.
+3. Click **Edit code**, replace everything with the contents of `proxy/worker.js`, and click **Deploy**.
+   If your site isn't at `https://astroficboy.github.io`, add its address to `ALLOWED_ORIGINS` first.
+4. Copy the Worker's URL (e.g. `https://gods-eye-proxy.<you>.workers.dev`) into `PROXY_URL` in
+   `web/config.js`, then commit.
+
+The site still tries each source directly first. It only uses the proxy for sources that refuse, so most traffic
+never touches the Worker.
+
+ (Docker; works on Render, Railway, Fly.io, Cloud Run, a VPS):**
 ```
 docker build -t gods-eye . && docker run -p 8080:8080 gods-eye
 ```
@@ -110,6 +127,8 @@ web/js/toolkit.js OSINT Framework browser (search, filters, selector detection)
 web/data/        bundled OSINT Framework catalogue + licence
 tools/update_osint_framework.py  regenerate web/data/osint-framework.json
 web/js/direct.js serverless mode: the /api routes implemented in the browser
+web/config.js    PROXY_URL setting for serverless mode
+proxy/worker.js  optional Cloudflare Worker CORS proxy (tests: node --test tests/*.test.mjs)
 tests/           python -m unittest discover -s tests (also run by .github/workflows/ci.yml)
 ```
 
