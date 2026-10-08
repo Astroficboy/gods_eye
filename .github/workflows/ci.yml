@@ -15,5 +15,7 @@ jobs:
           node-version: "22"
       - name: Unit tests
         run: python -m unittest discover -s tests -v
+      - name: Proxy worker tests
+        run: node --test tests/*.test.mjs
       - name: JavaScript syntax
-        run: for f in web/js/*.js; do node --check --input-type=module < "$f"; done
+        run: for f in web/js/*.js web/config.js proxy/worker.js; do node --check --input-type=module < "$f"; done
